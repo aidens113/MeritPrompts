@@ -1,7 +1,7 @@
 ---
 name: act-on-recommendation-dont-ask
 scope: global
-description: When the supervisor already has a recommended option for a decision, Aiden wants it acted on and reported, not put to him as a question, in every project.
+description: When the supervisor has a recommended option, Aiden wants it acted on and reported, not asked; known problems get fixed, never listed for him to decide, in every project.
 origin: FluxIQWebExtension, 2026-09-15
 ---
 
@@ -19,6 +19,13 @@ This covers operational and judgment calls such as accepting a disclosed
 exception, quarantining an orphaned file to unblock a run, choosing between fix
 designs, or deciding a follow-up is out of scope. Keep working on everything
 else in parallel rather than stopping.
+
+Known problems are not decisions at all. On 2026-11-03 a report listed what a
+finished unit had left unfinished as "left out on purpose, for you to decide"
+and asked whether to start. Aiden answered "Decide what?? obviously fix the
+problems if there are them". Fix defects and leftovers found along the way, and
+never record them in a report or working document as the user's to decide. A
+worker's "for you to decide" is addressed to the lead, who decides it.
 
 Asking is still right in two cases. The first is an action a repository's
 instructions require explicit approval for every time, such as pushing to

@@ -3,7 +3,7 @@
 Standing preferences and corrections that apply to every repository. One line per lesson; read
 the lesson file only when its line is relevant. Maintained by `/lesson`.
 
-- [Act on your recommendation instead of asking](act-on-recommendation-dont-ask.md): When the supervisor already has a recommended option for a decision, Aiden wants it acted on and reported, not put to him as a question, in every project.
+- [Act on your recommendation instead of asking](act-on-recommendation-dont-ask.md): When the supervisor has a recommended option, Aiden wants it acted on and reported, not asked; known problems get fixed, never listed for him to decide, in every project.
 - [Answer a direct question in the first line](answer-direct-questions-first.md): When Aiden asks a direct question mid-task, the first line of the reply is the direct answer (a number, an ETA, yes or no), before any status, plan or tool work, in every project.
 - [Ask before stopping a paid run at wrap-up](ask-before-stopping-paid-run-at-wrap-up.md): When Aiden asks to wrap up while an approved paid run is in flight, say it is running and ask whether to wait for it or stop it, instead of killing it at once; in every project.
 - [Design agent tooling globally, with global and project memory tiers](design-agent-tooling-globally-with-memory-tiers.md): Aiden wants agent instructions, delegation rules, and memory designed to work globally across all his projects, with explicit global shared memory and project-specific memory, and with token cost as a first-class design constraint.
