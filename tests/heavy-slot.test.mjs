@@ -34,7 +34,7 @@ test('commit pressure refuses admission even with plenty of physical memory', ()
 });
 test('non-atomic footprint telemetry cannot credit unproved available capacity', () => {
   const holders = [{ needBytes: 4 * GB, workingBytes: GB, privateBytes: 2 * GB }];
-  assert.equal(decide({ holders, memory: { physicalAvailableBytes: 5.9 * GB, commitAvailableBytes: 8 * GB } }).allowed, false);
+  assert.equal(decide({ holders, memory: { physicalAvailableBytes: 5.9 * GB, commitAvailableBytes: 6.9 * GB } }).allowed, false);
   assert.equal(decide({ holders, memory: { physicalAvailableBytes: 7 * GB, commitAvailableBytes: 7 * GB } }).allowed, true);
   assert.equal(decide({ holders: [{ ...holders[0], workingBytes: 4 * GB, privateBytes: 4 * GB }] }).allowed, false);
 });
@@ -64,7 +64,7 @@ function fixture(t, options = {}) {
 }
 
 test('concurrent admissions cannot both spend the same available headroom', async (t) => {
-  const { root, gate } = fixture(t);
+  const { root, gate } = fixture(t, { sample: async () => ({ physicalAvailableBytes: 4 * GB, commitAvailableBytes: 4 * GB, sampledAt: Date.now(), processes: [] }) });
   const other = new HeavyGate(root, { sample: gate.sample, delay: gate.delay });
   const results = await Promise.allSettled([gate.take('one', { key: 'tests', needBytes: 2 * GB }), other.take('two', { key: 'tests', needBytes: 2 * GB })]);
   assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
@@ -514,4 +514,13 @@ test('missing or future process identity telemetry cannot remove a live ticket',
   const { gate } = fixture(t, { alive: () => true, sample: async () => ({ physicalAvailableBytes: 4 * GB, commitAvailableBytes: 8 * GB, sampledAt: now, bootedAt: now + 1000, processes: [{ pid: 123, createdAtMs: now + 1000 }] }) });
   const ticket = gate.state.enqueue('current', GB, 'tests', 123);
   assert.deepEqual((await gate.status()).queue.map((item) => item.id), [ticket.id]);
+});
+
+
+test('pagefile-backed capacity admits a peak larger than free RAM without relaxing commit reservations', () => {
+  const memory = { physicalAvailableBytes: 2 * GB, commitAvailableBytes: 32 * GB };
+  assert.equal(decide({ memory, needBytes: 5 * GB }).allowed, true);
+  assert.equal(decide({ memory: { ...memory, physicalAvailableBytes: 0.9 * GB }, needBytes: 5 * GB }).allowed, false);
+  assert.equal(decide({ memory: { ...memory, commitAvailableBytes: 5.9 * GB }, needBytes: 5 * GB }).allowed, false);
+  assert.equal(decide({ memory: { ...memory, commitAvailableBytes: 8 * GB }, needBytes: 5 * GB, holders: [{ needBytes: 3 * GB }] }).allowed, false);
 });

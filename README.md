@@ -218,3 +218,5 @@ report does not measure Codex sessions.
   cost of occasionally denying quoted text such as `echo "git is ..."` from a subagent.
 
 The Windows heavy-job gate also checks process creation and system boot times when pruning stale queue entries. A reused process ID cannot keep a pre-reboot job queued, and old reservations cannot learn memory usage from an unrelated replacement process. Missing identity evidence retains live entries conservatively.
+
+Admission reserves each job's estimated peak against available Windows system commit capacity, which includes the page file. A separate 1 GiB available-RAM floor, FIFO ordering, fresh telemetry and two-job limit remain enforced. This allows configured paging capacity to serve memory-intensive checks; it does not promise RAM-speed execution. See [Microsoft's page-file guidance](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file).
