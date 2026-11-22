@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { admission, commandProfile, estimateNeed, HEAVY_POLL_MS } from '../tools/heavy-slot/policy.mjs';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, openSync, closeSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { HeavyGate } from '../tools/heavy-slot/scheduler.mjs';
@@ -142,6 +142,44 @@ test('corrupt persisted ownership is diagnosed rather than silently deleted', as
   const { root } = fixture(t);
   writeFileSync(path.join(root, 'admission.lock'), '{broken');
   await assert.rejects(withStateLock(root, () => {}), SyntaxError);
+});
+
+test('a prior open lock reader cannot block the next owner or expose a delete-pending shared name', async (t) => {
+  const { root } = fixture(t);
+  const lock = path.join(root, 'admission.lock');
+  let reader;
+  let firstNonce;
+  try {
+    await withStateLock(root, () => {
+      reader = openSync(lock, 'r');
+      firstNonce = JSON.parse(readFileSync(lock, 'utf8')).nonce;
+    });
+    await withStateLock(root, () => {
+      assert.notEqual(JSON.parse(readFileSync(lock, 'utf8')).nonce, firstNonce);
+      assert.equal(JSON.parse(readFileSync(reader, 'utf8')).nonce, firstNonce);
+    });
+  } finally { if (reader !== undefined) closeSync(reader); }
+  assert.equal(readdirSync(root).some((name) => name.startsWith('admission.lock') || name.startsWith('lock-')), false);
+});
+
+test('independent processes contend for the shared lock without losing ownership or increments', async (t) => {
+  const { root } = fixture(t);
+  const counter = path.join(root, 'counter.json');
+  writeFileSync(counter, '0');
+  const source = `
+    import { readFileSync, writeFileSync } from 'node:fs';
+    import { withStateLock } from ${JSON.stringify(new URL('../tools/heavy-slot/state.mjs', import.meta.url).href)};
+    const root = process.argv[1], counter = process.argv[2];
+    for (let index = 0; index < 100; index++) await withStateLock(root, async () => {
+      const previous = JSON.parse(readFileSync(counter, 'utf8'));
+      await new Promise(resolve => setTimeout(resolve, 1));
+      writeFileSync(counter, JSON.stringify(previous + 1));
+    });
+  `;
+  const results = await Promise.allSettled(Array.from({ length: 4 }, () => promisify(execFile)(process.execPath, ['--input-type=module', '-e', source, root, counter])));
+  for (const result of results) assert.equal(result.status, 'fulfilled', result.status === 'rejected' ? String(result.reason) : undefined);
+  assert.equal(JSON.parse(readFileSync(counter, 'utf8')), 400);
+  assert.equal(readdirSync(root).some((name) => name.startsWith('admission.lock') || name.startsWith('lock-')), false);
 });
 
 test('footprints include child descendants and retain their observed peak', () => {

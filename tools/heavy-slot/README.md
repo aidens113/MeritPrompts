@@ -19,6 +19,14 @@ the existing five-second polling cadence, or dated in the future, cannot admit
 work; delayed probing/lock acquisition must obtain fresh evidence. This is
 resource-evidence validity, never a deadline or timeout for an admitted job.
 
+The admission mutex publishes a complete immutable owner record by hard link.
+Release and dead-owner reclamation atomically rename that shared name before
+deleting the retired file. Windows can deny opens against a delete-pending
+filename while another process still reads it; retirement keeps that state
+off the shared admission name. A contender never releases another owner's
+lock, and dead-owner reclamation retains its nonce-specific reaper claim. See
+[Windows deletion semantics](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-deletefile).
+
 Command execution and new lease admission are supported only on Windows.
 Execution requires Windows 10/Server 2016 or newer with creation-time kernel
 job assignment. `run` and `acquire` refuse other platforms before reserving a
