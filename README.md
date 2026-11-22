@@ -216,3 +216,5 @@ report does not measure Codex sessions.
   per token).
 - `git-guard` parses commands heuristically. It catches `git` inside `bash -c "..."`, at the
   cost of occasionally denying quoted text such as `echo "git is ..."` from a subagent.
+
+The Windows heavy-job gate also checks process creation and system boot times when pruning stale queue entries. A reused process ID cannot keep a pre-reboot job queued, and old reservations cannot learn memory usage from an unrelated replacement process. Missing identity evidence retains live entries conservatively.

@@ -487,3 +487,31 @@ test('unsupported platforms cannot acquire leases or launch work', async () => {
   await assert.rejects(runHeavySlot(['run', 'unsupported', '--', process.execPath], { gate, platform: 'darwin' }), /no proven process-tree owner/);
   assert.equal(called, false);
 });
+
+
+test('process creation identity removes a stale ticket despite a reused live PID', async (t) => {
+  const now = Date.now();
+  const { gate } = fixture(t, { alive: () => true, sample: async () => ({ physicalAvailableBytes: 4 * GB, commitAvailableBytes: 8 * GB, sampledAt: now + 1000, processes: [{ pid: 123, createdAtMs: now + 100 }] }) });
+  const stale = gate.state.enqueue('old process', GB, 'tests', 123);
+  const live = gate.state.enqueue('surviving process', GB, 'tests', 456);
+  assert.equal((await gate.status()).queue.some((ticket) => ticket.id === stale.id), false);
+  assert.deepEqual((await gate.status()).queue.map((ticket) => ticket.id), [live.id]);
+});
+
+test('reboot removes old command reservations and tickets without learning reused process memory', async (t) => {
+  const now = Date.now();
+  const { gate } = fixture(t, { alive: () => true, sample: async () => ({ physicalAvailableBytes: 4 * GB, commitAvailableBytes: 8 * GB, sampledAt: now + 2000, bootedAt: now + 1000, processes: [{ pid: 123, workingBytes: 9 * GB, privateBytes: 9 * GB }] }) });
+  const old = gate.state.enqueue('old boot', GB, 'tests', 123);
+  gate.state.saveHolder({ ...old, kind: 'run', launchState: 'starting', peakBytes: GB });
+  const state = await gate.status();
+  assert.equal(state.queue.length, 0);
+  assert.equal(state.holders.length, 0);
+  assert.equal(gate.state.history().tests.peakBytes, GB);
+});
+
+test('missing or future process identity telemetry cannot remove a live ticket', async (t) => {
+  const now = Date.now();
+  const { gate } = fixture(t, { alive: () => true, sample: async () => ({ physicalAvailableBytes: 4 * GB, commitAvailableBytes: 8 * GB, sampledAt: now, bootedAt: now + 1000, processes: [{ pid: 123, createdAtMs: now + 1000 }] }) });
+  const ticket = gate.state.enqueue('current', GB, 'tests', 123);
+  assert.deepEqual((await gate.status()).queue.map((item) => item.id), [ticket.id]);
+});

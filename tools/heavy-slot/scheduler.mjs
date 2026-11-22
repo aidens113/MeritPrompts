@@ -3,6 +3,15 @@ import { admission, estimateNeed, HEAVY_POLL_MS } from './policy.mjs';
 import { holderFootprint, memorySnapshot } from './memory.mjs';
 import { CONTAINMENT } from './owned-process.mjs';
 
+function predatesBoot(timestamp, snapshot) {
+  return Number.isFinite(timestamp) && Number.isFinite(snapshot?.bootedAt) && snapshot.bootedAt <= snapshot.sampledAt && timestamp < snapshot.bootedAt;
+}
+
+function reusedTicketPid(ticket, snapshot) {
+  const current = snapshot?.processes?.find((row) => row.pid === ticket.pid);
+  return Number.isFinite(ticket.queuedAt) && Number.isFinite(current?.createdAtMs) && current.createdAtMs <= snapshot.sampledAt && current.createdAtMs > ticket.queuedAt;
+}
+
 export class HeavyGate {
   constructor(root, { sample = memorySnapshot, alive = processAlive, delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now } = {}) {
     this.state = new GateState(root);
@@ -12,8 +21,15 @@ export class HeavyGate {
     this.now = now;
   }
   prune(snapshot) {
-    for (const ticket of this.state.tickets()) if (!this.alive(ticket.pid)) this.state.dropTicket(ticket);
+    for (const ticket of this.state.tickets()) if (!this.alive(ticket.pid) || predatesBoot(ticket.queuedAt, snapshot) || reusedTicketPid(ticket, snapshot)) this.state.dropTicket(ticket);
     for (const held of this.state.holders()) {
+      // No executable process survives a system reboot. Never learn the footprint
+      // of an unrelated process that inherited an old PID after boot.
+      if (held.kind === 'run' && predatesBoot(held.queuedAt ?? held.startedAt, snapshot)) {
+        this.state.learn(held);
+        this.state.dropHolder(held);
+        continue;
+      }
       const observed = snapshot ? holderFootprint(held, snapshot) : held;
       const expired = held.kind === 'lease' && held.expiresAt <= this.now();
       if (held.containment !== undefined && held.containment !== CONTAINMENT) throw new Error('Unknown process containment metadata; reservation was retained.');
