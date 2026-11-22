@@ -1,6 +1,6 @@
 {
   "name": "meritprompts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Shared Claude Code and Codex rules, Claude agents and hooks, and automatic git and npm release management",
   "repository": { "type": "git", "url": "https://github.com/aidens113/MeritPrompts.git" },

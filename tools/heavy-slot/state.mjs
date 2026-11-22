@@ -37,6 +37,16 @@ function claimReaping(root, nonce, temporary, alive) {
   }
 }
 
+// Retire the shared name before deleting its file. Windows keeps a deleted file
+// pending while another reader holds it; opening that name then fails EPERM,
+// rather than ENOENT. An atomic rename lets contenders see the next owner or no
+// owner, while any readers of the prior inode finish under its private name.
+function retireLock(lock, nonce) {
+  const retired = `${lock}.retired-${nonce}`;
+  renameSync(lock, retired);
+  removeFile(retired);
+}
+
 /** Link a fully written owner record: another process never sees an empty lock. */
 export async function withStateLock(root, action, { alive = processAlive, wait = () => new Promise((resolve) => setTimeout(resolve, 25)) } = {}) {
   mkdirSync(root, { recursive: true });
@@ -44,22 +54,25 @@ export async function withStateLock(root, action, { alive = processAlive, wait =
   const owner = { pid: process.pid, nonce: randomUUID() };
   const temporary = path.join(root, `lock-${owner.pid}-${owner.nonce}.tmp`);
   writeFileSync(temporary, JSON.stringify(owner));
+  let acquired = false;
   try {
     for (;;) {
-      try { linkSync(temporary, lock); break; }
+      try { linkSync(temporary, lock); acquired = true; break; }
       catch (error) {
         if (error.code !== 'EEXIST') throw error;
         const previous = readJson(lock);
         if (previous && !alive(previous.pid) && claimReaping(root, previous.nonce, temporary, alive)) {
           // Recheck identity so a released/replaced lock is never removed by a stale observation.
-          if (readJson(lock)?.nonce === previous.nonce) removeFile(lock);
+          if (readJson(lock)?.nonce === previous.nonce) retireLock(lock, previous.nonce);
         } else await wait();
       }
     }
     return await action();
   } finally {
-    if (readJson(lock)?.nonce === owner.nonce) removeFile(lock);
-    removeFile(temporary);
+    // A contender never owned the lock and has nothing to inspect or release.
+    // A live owner cannot be reaped, so ownership lasts until this rename.
+    try { if (acquired) retireLock(lock, owner.nonce); }
+    finally { removeFile(temporary); }
   }
 }
 
