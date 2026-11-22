@@ -2,14 +2,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
-const WINDOWS_SAMPLE = `$gateProcesses = @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize,PrivatePageCount); $gateProbeStart = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); $gateMemory = Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory; @{physicalAvailableBytes=[double]$gateMemory.AvailableBytes;commitAvailableBytes=[double]($gateMemory.CommitLimit-$gateMemory.CommittedBytes);sampledAt=$gateProbeStart;processes=$gateProcesses} | ConvertTo-Json -Depth 4 -Compress`;
+const WINDOWS_SAMPLE = `$gateProcesses = @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize,PrivatePageCount,@{Name='CreatedAtMs';Expression={if ($null -ne $_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() }}}); $gateBoot = Get-CimInstance Win32_OperatingSystem; $gateBootedAt = if ($null -ne $gateBoot.LastBootUpTime) { ([DateTimeOffset]$gateBoot.LastBootUpTime).ToUnixTimeMilliseconds() } else { $null }; $gateProbeStart = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); $gateMemory = Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory; @{physicalAvailableBytes=[double]$gateMemory.AvailableBytes;commitAvailableBytes=[double]($gateMemory.CommitLimit-$gateMemory.CommittedBytes);sampledAt=$gateProbeStart;bootedAt=$gateBootedAt;processes=$gateProcesses} | ConvertTo-Json -Depth 4 -Compress`;
 
 /** No command lines, credentials or page content are collected. */
 export async function memorySnapshot({ signal, executeWindows = execute } = {}) {
   if (process.platform === 'win32') {
     const { stdout } = await executeWindows('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(WINDOWS_SAMPLE, 'utf16le').toString('base64')], { windowsHide: true, maxBuffer: 8 * 1024 * 1024, signal });
     const result = JSON.parse(stdout);
-    return { ...result, processes: (result.processes ?? []).map((row) => ({ pid: Number(row.ProcessId), parentPid: Number(row.ParentProcessId), workingBytes: Number(row.WorkingSetSize), privateBytes: Number(row.PrivatePageCount) })) };
+    return { ...result, processes: (result.processes ?? []).map((row) => ({ pid: Number(row.ProcessId), parentPid: Number(row.ParentProcessId), workingBytes: Number(row.WorkingSetSize), privateBytes: Number(row.PrivatePageCount), ...(row.CreatedAtMs == null ? {} : { createdAtMs: Number(row.CreatedAtMs) }) })) };
   }
   throw new Error('Validated system headroom telemetry is supported only on Windows; no heavy job was admitted.');
 }

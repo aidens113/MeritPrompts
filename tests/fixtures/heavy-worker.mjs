@@ -7,7 +7,7 @@ import { withStateLock } from '../../tools/heavy-slot/state.mjs';
 
 const [root, label, mode] = process.argv.slice(2);
 const gate = new HeavyGate(root, {
-  sample: async () => ({ physicalAvailableBytes: 4 * 2 ** 30, commitAvailableBytes: 8 * 2 ** 30, sampledAt: Date.now(), processes: [] }),
+  sample: async () => ({ physicalAvailableBytes: 4 * 2 ** 30, commitAvailableBytes: 4 * 2 ** 30, sampledAt: Date.now(), processes: [] }),
   delay: (ms) => new Promise((resolve) => setTimeout(resolve, Math.min(ms, 10)))
 });
 if (mode === 'crash-lock') await withStateLock(root, () => process.exit(0));

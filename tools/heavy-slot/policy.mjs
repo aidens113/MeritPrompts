@@ -27,12 +27,12 @@ export function admission({ ticket, queue, holders, memory, needBytes, reserveBy
   }
   if (memory.sampledAt > now || now - memory.sampledAt > HEAVY_POLL_MS) return { allowed: false, reason: 'memory telemetry is stale or has a future timestamp' };
   if (holders.some((holder) => !Number.isFinite(holder.needBytes) || holder.needBytes <= 0)) return { allowed: false, reason: 'a holder has invalid reservation metadata' };
-  // OS headroom and process footprints are not one atomic measurement. Subtracting
-  // a later footprint could credit memory that the earlier headroom never included.
-  // Keep the full reservations; observed usage learns peaks but never grants capacity.
-  const physicalPending = holders.reduce((total, holder) => total + holder.needBytes, 0);
-  const commitPending = physicalPending;
-  if (memory.physicalAvailableBytes < reserveBytes + physicalPending + needBytes) return { allowed: false, reason: 'insufficient physical headroom for the reserved peak' };
+  // Private allocations are backed by the system commit limit (RAM plus pagefiles),
+  // not necessarily resident RAM. Keep an immediate physical floor for responsiveness,
+  // but reserve job peaks against commit so configured pagefile capacity is usable.
+  // Retain full active reservations: sampled footprints cannot credit capacity.
+  const commitPending = holders.reduce((total, holder) => total + holder.needBytes, 0);
+  if (memory.physicalAvailableBytes < reserveBytes) return { allowed: false, reason: 'insufficient physical headroom for the system reserve' };
   if (memory.commitAvailableBytes < reserveBytes + commitPending + needBytes) return { allowed: false, reason: 'insufficient system commit headroom for the reserved peak' };
-  return { allowed: true, reason: 'peak reservation fits physical and commit headroom' };
+  return { allowed: true, reason: 'peak reservation fits commit headroom and physical reserve is available' };
 }
