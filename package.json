@@ -1,6 +1,6 @@
 {
   "name": "meritprompts",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Shared Claude Code and Codex rules, Claude agents and hooks, and automatic git and npm release management",
   "repository": { "type": "git", "url": "https://github.com/aidens113/MeritPrompts.git" },
@@ -9,7 +9,7 @@
   "bin": { "meritprompts": "bin/meritprompts.mjs" },
   "files": ["AGENTS.md", "CLAUDE.md", "CODEX.md", "agents", "bin", "hooks", "lessons", "skills", "templates", "tools", "install.mjs"],
   "scripts": {
-    "test": "node --test tests/hooks.test.mjs tests/git.test.mjs tests/install.test.mjs tests/working-docs-audit.test.mjs",
+    "test": "node --test tests/hooks.test.mjs tests/git.test.mjs tests/install.test.mjs tests/working-docs-audit.test.mjs tests/heavy-slot.test.mjs",
     "install-config": "node install.mjs",
     "usage": "node tools/usage-report.mjs",
     "branch": "node tools/branch.mjs"
